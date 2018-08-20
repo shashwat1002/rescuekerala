@@ -6,7 +6,7 @@ from django.views.generic.base import TemplateView
 from mainapp.redis_queue import sms_queue
 from mainapp.sms_handler import send_confirmation_sms
 from .models import Request, Volunteer, DistrictManager, Contributor, DistrictNeed, Person, RescueCamp, NGO, \
-    Announcements, ReliefCampData
+    Announcements , districts
 import django_filters
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import JsonResponse
@@ -25,6 +25,7 @@ from django.urls import reverse
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.http import Http404
 from mainapp.admin import create_csv_response
+import csv
 
 class CustomForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -79,6 +80,16 @@ class RegisterVolunteer(CreateView):
     fields = ['name', 'district', 'phone', 'organisation', 'area', 'address']
     success_url = '/reg_success/'
 
+def volunteerdata(request):
+    filter = VolunteerFilter(request.GET, queryset=Volunteer.objects.all() )
+    req_data = filter.qs.order_by('-id')
+    paginator = Paginator(req_data, PER_PAGE)
+    page = request.GET.get('page')
+    req_data = paginator.get_page(page)
+    req_data.min_page = req_data.number - PAGE_LEFT
+    req_data.max_page = req_data.number + PAGE_RIGHT
+    req_data.lim_page = PAGE_INTERMEDIATE
+    return render(request, 'mainapp/volunteerview.html', {'filter': filter , "data" : req_data })
 
 class RegisterNGO(CreateView):
     model = NGO
@@ -118,6 +129,7 @@ def download_ngo_list(request):
     )
     return create_csv_response(filename, header_row, body_rows)
 
+
 class RegisterContributor(CreateView):
     model = Contributor
     fields = ['name', 'district', 'phone', 'address',  'commodities']
@@ -139,6 +151,7 @@ class MapView(TemplateView):
 class ReqSuccess(TemplateView):
     template_name = "mainapp/req_success.html"
 
+
 class RegSuccess(TemplateView):
     template_name = "mainapp/reg_success.html"
 
@@ -150,11 +163,14 @@ class SubmissionSuccess(TemplateView):
 class ContribSuccess(TemplateView):
     template_name = "mainapp/contrib_success.html"
 
+
 class DisclaimerPage(TemplateView):
     template_name = "mainapp/disclaimer.html"
 
+
 class AboutIEEE(TemplateView):
     template_name = "mainapp/aboutieee.html"
+
 
 class DistNeeds(TemplateView):
     template_name = "mainapp/district_needs.html"
@@ -165,6 +181,7 @@ class DistNeeds(TemplateView):
         # Add in a QuerySet of all the books
         context['district_data'] = DistrictNeed.objects.all()
         return context
+
 
 class RescueCampFilter(django_filters.FilterSet):
     class Meta:
@@ -177,14 +194,17 @@ class RescueCampFilter(django_filters.FilterSet):
         if self.data == {}:
             self.queryset = self.queryset.none()
 
+
 def relief_camps(request):
     return render(request,"mainapp/relief_camps.html")
 
+
 def relief_camps_list(request):
-    filter = RescueCampFilter(request.GET, queryset=RescueCamp.objects.all())
+    filter = RescueCampFilter(request.GET, queryset=RescueCamp.objects.filter(status='active'))
     relief_camps = filter.qs.annotate(count=Count('person')).order_by('district','name').all()
 
     return render(request, 'mainapp/relief_camps_list.html', {'filter': filter , 'relief_camps' : relief_camps, 'district_chosen' : len(request.GET.get('district') or '')>0 })
+
 
 class RequestFilter(django_filters.FilterSet):
     class Meta:
@@ -195,11 +215,46 @@ class RequestFilter(django_filters.FilterSet):
                     'district' : ['exact'],
                     'requestee' : ['icontains'],
                     'requestee_phone' : ['exact'],
-                    'location' : ['icontains']
+                    'location' : ['icontains'],
+                    'needrescue': ['exact'],
+                    'needwater' : ['exact'],
+                    'needfood' : ['exact'],
+                    'needcloth' : ['exact'],
+                    'needmed' : ['exact'],
+                    'needkit_util' : ['exact'],
+                    'needtoilet' : ['exact'],
+                    'needothers' : ['exact']
                  }
 
     def __init__(self, *args, **kwargs):
         super(RequestFilter, self).__init__(*args, **kwargs)
+        # at startup user doen't push Submit button, and QueryDict (in data) is empty
+        if self.data == {}:
+            self.queryset = self.queryset.none()
+
+class VolunteerFilter(django_filters.FilterSet):
+    class Meta:
+        model = Volunteer
+        fields = {
+                    'district' : ['exact'],
+                    'area' : ['exact'],
+                 }
+
+    def __init__(self, *args, **kwargs):
+        super(VolunteerFilter, self).__init__(*args, **kwargs)
+        # at startup user doen't push Submit button, and QueryDict (in data) is empty
+        if self.data == {}:
+            self.queryset = self.queryset.none()
+
+class NGOFilter(django_filters.FilterSet):
+    class Meta:
+        model = NGO
+        fields = {
+                    'district' : ['exact'],
+                 }
+
+    def __init__(self, *args, **kwargs):
+        super(NGOFilter, self).__init__(*args, **kwargs)
         # at startup user doen't push Submit button, and QueryDict (in data) is empty
         if self.data == {}:
             self.queryset = self.queryset.none()
@@ -215,6 +270,18 @@ def request_list(request):
     req_data.max_page = req_data.number + PAGE_RIGHT
     req_data.lim_page = PAGE_INTERMEDIATE
     return render(request, 'mainapp/request_list.html', {'filter': filter , "data" : req_data })
+
+
+def ngo_list(request):
+    filter = NGOFilter(request.GET, queryset=NGO.objects.all() )
+    ngo_data = filter.qs.order_by('-id')
+    paginator = Paginator(ngo_data, PER_PAGE)
+    page = request.GET.get('page')
+    ngo_data = paginator.get_page(page)
+    ngo_data.min_page = ngo_data.number - PAGE_LEFT
+    ngo_data.max_page = ngo_data.number + PAGE_RIGHT
+    ngo_data.lim_page = PAGE_INTERMEDIATE
+    return render(request, 'mainapp/ngo_list.html', {'filter': filter , "data" : ngo_data })
 
 def request_details(request, request_id=None):
     if not request_id:
@@ -243,6 +310,17 @@ def districtmanager_list(request):
 
 class Maintenance(TemplateView):
     template_name = "mainapp/maintenance.html"
+
+def relief_camps_data(request):
+    try:
+        offset = int(request.GET.get('offset'))
+    except:
+        offset = 0
+    last_record = RescueCamp.objects.latest('id')
+    relief_camp_data = (RescueCamp.objects.filter(id__gt=offset).order_by('id')[:300]).values()
+    description = 'select * from mainapp_rescuecamp where id > offset order by id limit 300'
+    response = {'data': list(relief_camp_data), 'meta': {'offset': offset, 'limit': 300, 'description': description,'last_record_id': last_record.id}}
+    return JsonResponse(response, safe=False)
 
 def data(request):
     try:
@@ -273,6 +351,69 @@ def mapview(request):
 def dmodash(request):
     return render(request , "dmodash.html")
 
+def dmodist(request):
+    d = []
+    for district in districts:
+        camps = 0 ;total_people = 0 ;total_male = 0 ; total_female = 0 ; total_infant = 0 ; total_medical = 0
+
+        for i in RescueCamp.objects.all().filter(district = district[0]):
+            camps+=1
+            total_people += ifnonezero(i.total_people)
+            total_male  += ifnonezero(i.total_males)
+            total_female += ifnonezero(i.total_females)
+            total_infant += ifnonezero(i.total_infants)
+            if(i.medical_req.strip() != ""):total_medical+=1
+
+        d.append( { "district" : district[1] , "total_camp" : camps , "total_people" : total_people , "total_male" : total_male , "total_female" : total_female , "total_infant" : total_infant , "total_medical" : total_medical   } )
+    return render(request , "dmodist.html" , {"camps" : d }  )
+
+def dmotal(request):
+    if(request.GET.get("district",-1) == -1):return render(request , "dmotal.html"  )
+    dist = request.GET.get("district",-1)
+    if(dist == "all"): data = RescueCamp.objects.all().values('taluk').distinct()
+    else:data = RescueCamp.objects.all().filter(district = dist).values('taluk').distinct()
+    distmapper = {}
+    for i in districts:
+        distmapper[i[0]] = i[1]
+    d = []
+    for taluk in data :
+        camps = 0 ;total_people = 0 ;total_male = 0 ; total_female = 0 ; total_infant = 0 ; total_medical = 0;district = ""
+        for i in RescueCamp.objects.all().filter(taluk = taluk["taluk"]):
+            camps+=1
+            district = i.district
+            total_people += ifnonezero(i.total_people)
+            total_male  += ifnonezero(i.total_males)
+            total_female += ifnonezero(i.total_females)
+            total_infant += ifnonezero(i.total_infants)
+            if(i.medical_req.strip() != ""):total_medical+=1
+
+        d.append( { "district" : distmapper[district] , "taluk" : taluk["taluk"] ,"total_camp" : camps , "total_people" : total_people , "total_male" : total_male , "total_female" : total_female , "total_infant" : total_infant , "total_medical" : total_medical   } )
+    return render(request , "dmotal.html" , {"camps" : d }  )
+
+
+def dmocsv(request):
+    if("district" not in request.GET.keys()):return HttpResponseRedirect("/")
+    dist = request.GET.get("district")
+    header_row = [i.name for i in RescueCamp._meta.get_fields() ][1:]  # There is a person field in the begining , to remove that
+    body_rows = []
+    csv_name = "{}-data".format(dist)
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="{}.csv"'.format(csv_name)
+    writer = csv.writer(response)
+    writer.writerow(header_row)
+    for camp in RescueCamp.objects.all().filter(district = dist):
+        row = [
+            getattr(camp , key)  for key in header_row
+        ]
+        writer.writerow(row)
+
+
+    return response
+
+def ifnonezero(val):
+    if(val == None):return 0
+    return val
+
 def dmoinfo(request):
     if("district" not in request.GET.keys()):return HttpResponseRedirect("/")
     dist = request.GET.get("district")
@@ -281,7 +422,21 @@ def dmoinfo(request):
     volcount = Volunteer.objects.all().filter(district = dist).count()
     conserve = Contributor.objects.all().filter(status = "ful" , district = dist).count()
     contotal = Contributor.objects.all().filter(district = dist).count()
-    return render(request ,"dmoinfo.html",{"reqserve" : reqserve , "reqtotal" : reqtotal , "volcount" : volcount , "conserve" : conserve , "contotal" : contotal })
+
+    camps = RescueCamp.objects.all().filter(district = dist)
+
+    total_people = 0 ;total_male = 0 ; total_female = 0 ; total_infant = 0 ; total_medical = 0
+
+    for i in camps:
+
+        total_people += ifnonezero(i.total_people)
+        total_male  += ifnonezero(i.total_males)
+        total_female += ifnonezero(i.total_females)
+        total_infant += ifnonezero(i.total_infants)
+        if(i.medical_req.strip() != ""):total_medical+=1
+
+    return render(request ,"dmoinfo.html",{"district" : dist , "reqserve" : reqserve , "reqtotal" : reqtotal , "volcount" : volcount , "conserve" : conserve , "contotal" : contotal ,
+    "total_camps" : camps.count() ,"total_people" : total_people , "total_male" : total_male , "total_female" : total_female , "total_infant" : total_infant , "total_medical" : total_medical    })
 
 def error(request):
     error_text = request.GET.get('error_text')
@@ -390,7 +545,7 @@ class CampRequirementsForm(forms.ModelForm):
 class CampRequirements(SuccessMessageMixin,LoginRequiredMixin,UpdateView):
     login_url = '/login/'
     model = RescueCamp
-    template_name='mainapp/camp_requirements.html'  
+    template_name='mainapp/camp_requirements.html'
     form_class = CampRequirementsForm
     success_url = '/coordinator_home/'
     success_message = "Updated requirements saved!"
@@ -484,7 +639,7 @@ class CoordinatorCampFilter(django_filters.FilterSet):
             'district' : ['exact'],
             'name' : ['icontains']
         }
-    
+
     def __init__(self, *args, **kwargs):
         super(CoordinatorCampFilter, self).__init__(*args, **kwargs)
         if self.data == {}:
@@ -497,7 +652,7 @@ class CoordinatorCampFilter(django_filters.FilterSet):
             'district' : ['exact'],
             'name' : ['icontains']
         }
-    
+
     def __init__(self, *args, **kwargs):
         super(CoordinatorCampFilter, self).__init__(*args, **kwargs)
         if self.data == {}:
@@ -518,7 +673,9 @@ class CampRequirementsFilter(django_filters.FilterSet):
         model = RescueCamp
         fields = {
             'district' : ['exact'],
-            'name' : ['icontains']
+            'name' : ['icontains'],
+            'taluk' : ['icontains'],
+            'village' : ['icontains']
         }
 
     def __init__(self, *args, **kwargs):
@@ -533,9 +690,3 @@ def camp_requirements_list(request):
     page = request.GET.get('page')
     data = paginator.get_page(page)
     return render(request, "mainapp/camp_requirements_list.html", {'filter': filter , 'data' : data})
-
-
-class AddCampData(CreateView):
-    model = ReliefCampData
-    fields = ['description', 'file', 'district', 'phone']
-    success_url = '/submission_success/'

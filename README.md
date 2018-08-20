@@ -1,10 +1,10 @@
-# keralarescue
+<h1 align="center">KeralaRescue</h1>
 
 [![Build Status - Travis][0]][1] [![Open Source Helpers](https://www.codetriage.com/ieeekeralasection/rescuekerala/badges/users.svg)](https://www.codetriage.com/ieeekeralasection/rescuekerala)
 
-[![Join Kerala Rescue Slack channel](https://i.imgur.com/V7jxjak.png)](http://bit.ly/keralarescueslack)
+<p align="center">The Website for co-ordinating the rehabilitation of the people affected in the 2018 Kerala Floods.</p>
 
-The Website for co-ordinating the rehabilitation of the people affected in the 2018 Kerala Floods.
+[![Join Kerala Rescue Slack channel](https://i.imgur.com/V7jxjak.png)](http://bit.ly/keralarescueslack)
 
 ## Table of Contents
 - [Requirements](#requirements)
@@ -150,7 +150,7 @@ That's it!
 <hr>
 
 ### Creating migration files
-[^toc](#creating-migration-files)
+[^toc](#table-of-contents)
 
 If your code changes anything in models.py, you might need to make changes in database schema, or other constraints. To create migrations files, run python3 manage.py makemigrations --settings=floodrelief.settings after making your changes. Also make sure to add these files in the commit.
 
