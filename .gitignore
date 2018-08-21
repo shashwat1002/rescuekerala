@@ -5,6 +5,6 @@ __pycache__
 .env
 staticfiles/
 mysite.log
-floodrelief\settings.py
+settings.py
 venv
 .idea/*
