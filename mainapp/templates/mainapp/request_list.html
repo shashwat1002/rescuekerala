@@ -91,8 +91,9 @@
         <th>Requestee - അപേക്ഷകന്‍റെ പേര</th>
         <th>Phone - ഫോണ്‍ നമ്പര്‍</th>
         <th>Date - തീയതി</th>
-        <th>More details - കൂടുതൽ വിശദാംശങ്ങൾ</th>
-		<th>Update</th>
+        <th>More details/ update a request - 
+          കൂടുതൽ വിവരങ്ങൾ / ഒരു അപേക്ഷ സമർപ്പിക്കുക</th>
+		
       </tr>
     </thead>
     <tbody>
@@ -104,8 +105,8 @@
           <td>{{ req.requestee }}</td>
           <td><a href="tel:{{ req.requestee_phone }}" >{{ req.requestee_phone }}</a></td>
           <td>{{ req.dateadded }}</td>
-          <td><a class="btn btn-sm btn-success" href="{%url 'requestdetailsview' req.id %}" target="_blank">More details</a>
-	  	  <td><a class="btn btn-sm btn-success" href="{%url 'requestupdateview' req.id %}" target="_blank">Update</a></td>
+          <td><a class="btn btn-sm btn-success" href="{%url 'requestdetailsview' req.id %}" target="_blank">More details/ Update Request</a>
+	  	 
         </tr>
     {% endfor %}
   </tbody>

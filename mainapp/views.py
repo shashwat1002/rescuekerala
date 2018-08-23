@@ -359,7 +359,45 @@ def request_details(request, request_id=None):
     except:
         return HttpResponseRedirect("/error?error_text={}".format('Sorry, we couldnt fetch details for that request'))
     return render(request, 'mainapp/request_details.html', {'filter' : filter, 'req': req_data, 'updates': updates })
+class RequestDetails(CreateView):
+    model = RequestUpdate
+    template_name='mainapp/request_details.html'
+    fields = [
+        'status',
+        'other_status',
+        'updater_name',
+        'updater_phone',
+        'notes'
+    ]
+    success_url = '/req_update_success/'
+    
+    def original_request(self):
+        return self.original_request
+    
+    def updates(self):
+        return self.updates
+    def get_context_data(self, **kwargs):
+        context= super().get_context_data()
+        filter=RequestFilter(None)
+        context['filter']= filter
+        return context
 
+    #@method_decorator(login_required)
+    def dispatch(self, request, *args, **kwargs):
+        #could not use login_required decorator because it redirects to /accounts/login and we need /login
+        #disable authentication
+        # if not request.user.is_authenticated:
+        #     return redirect('/login'+'?next=request_updates/'+kwargs['request_id']+'/')
+            
+        self.original_request = get_object_or_404(Request, pk=kwargs['request_id'])
+        self.updates = RequestUpdate.objects.all().filter(request_id=kwargs['request_id']).order_by('-update_ts')
+        return super().dispatch(request, *args, **kwargs)
+        
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        self.object.request = self.original_request
+        self.object = form.save()
+        return HttpResponseRedirect(self.get_success_url())
 class DistrictManagerFilter(django_filters.FilterSet):
     class Meta:
         model = DistrictManager

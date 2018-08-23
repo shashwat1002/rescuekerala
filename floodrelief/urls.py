@@ -28,3 +28,4 @@ urlpatterns = [
     path('api/1/rest-auth/', include('rest_auth.urls')),
     path('api/1/', include('mainapp.api_urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+#CHANGED MEDIA_ROOT to STATIC_ROOT and STATIC_URL to  MEDIA_URL
