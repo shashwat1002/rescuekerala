@@ -7,12 +7,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
-
 import os
 import environ
 import dj_database_url
 import raven
 import datetime
+
+
 
 def get_list(text):
     return [item.strip() for item in text.split(',')]
@@ -50,10 +51,6 @@ RAVEN_CONFIG = {
     # 'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
 }
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
-
-# ALLOWED_HOSTS = ['127.0.0.1', 'keralarescue.herokuapp.com', 'keralarescue.in', 'www.keralarescue.in', 'localhost']
 
 
 # Application definition
@@ -109,13 +106,24 @@ WSGI_APPLICATION = 'floodrelief.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
-DATABASES = {
-    'default':{
-        'ENGINE':'django.db.backends.sqlite3',
-        'NAME':os.path.join(BASE_DIR,'db.sqlite3')
+# DATABASES = {
+#     # read os.environ['DATABASE_URL'] and raises ImproperlyConfigured exception if not found
+#     'default': env.db()
+# }
+DATABASES = {}
+DATABASES['default'] = dj_database_url.parse(env('B_DATABASE_URL'), conn_max_age=600)
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env('REDIS_URL'),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient"
+        },
+        "KEY_PREFIX": "keralarescue"
     }
 }
-
+CACHE_TIMEOUT = env('CACHE_TIMEOUT')
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
@@ -167,17 +175,7 @@ LOGGING = {
         },
     }
 }
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env('REDIS_URL'),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient"
-        },
-        "KEY_PREFIX": "keralarescue"
-    }
-}
-CACHE_TIMEOUT = env('CACHE_TIMEOUT')
+
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
@@ -202,5 +200,37 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = (
 	os.path.join(BASE_DIR, 'static'),
 )
+bucket_name = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+S3_URL = "https://{}.s3.ap-south-1.amazonaws.com".format(bucket_name,)
 
-ADMIN_SITE_HEADER = "test"
+
+if os.environ.get('USE_S3'):
+    AWS_STORAGE_BUCKET_NAME=bucket_name
+    AWS_ACCESS_KEY_ID=os.environ.get("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY=os.environ.get("AWS_SECRET_ACCESS_KEY")
+    AWS_QUERYSTRING_AUTH=False
+    MEDIA_URL = S3_URL + "/media/"
+    DEFAULT_FILE_STORAGE="storages.backends.s3boto3.S3Boto3Storage"
+else:
+    MEDIA_URL = '/media/'
+ADMIN_SITE_HEADER = "Keralarescue Dashboard"
+MEDIA_ROOT = 'media'
+
+#JWT REST Auth for API
+REST_USE_JWT = True
+JWT_AUTH = {
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=20)
+}
+REST_SESSION_LOGIN = False
+ACCOUNT_EMAIL_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'username'
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+    ),
+}
