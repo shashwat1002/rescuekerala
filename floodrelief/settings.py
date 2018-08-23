@@ -7,13 +7,30 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
+
 import os
+import environ
+import dj_database_url
+import raven
+import datetime
+
+def get_list(text):
+    return [item.strip() for item in text.split(',')]
+
+env = environ.Env(
+    # set casting, default value
+    DEBUG=(bool, False),
+    CACHE_TIMEOUT=(int, 60)
+)
+# reading .env file
+root = environ.Path(__file__) - 2
+environ.Env.read_env(root('.env'))
 
 # False if not in os.environ
-DEBUG = True
+DEBUG = env('DEBUG')
 
 # Raises django's ImproperlyConfigured exception if SECRET_KEY not in os.environ
-SECRET_KEY = "dfsdf"
+SECRET_KEY = env('SECRET_KEY')
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +40,21 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # ALLOWED_HOSTS = ['127.0.0.1', 'keralarescue.herokuapp.com', 'keralarescue.in', 'www.keralarescue.in', 'localhost']
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = get_list(os.environ.get('ALLOWED_HOSTS'))
+
+
+RAVEN_CONFIG = {
+    'dsn': env('SENTRY_DSN'),
+    # If you are using git, you can also automatically configure the
+    # release based on the git info.
+    # 'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
+}
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
+
+# ALLOWED_HOSTS = ['127.0.0.1', 'keralarescue.herokuapp.com', 'keralarescue.in', 'www.keralarescue.in', 'localhost']
+
 
 # Application definition
 
@@ -37,6 +68,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap3',
     'django_filters',
+    'storages',
+    'raven.contrib.django.raven_compat',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'rest_auth',
 ]
 
 MIDDLEWARE = [
@@ -131,7 +167,17 @@ LOGGING = {
         },
     }
 }
-
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env('REDIS_URL'),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient"
+        },
+        "KEY_PREFIX": "keralarescue"
+    }
+}
+CACHE_TIMEOUT = env('CACHE_TIMEOUT')
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 

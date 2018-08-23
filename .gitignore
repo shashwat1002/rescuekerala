@@ -6,5 +6,6 @@ __pycache__
 staticfiles/
 mysite.log
 settings.py
+urls.py
 venv
 .idea/*
