@@ -5,8 +5,8 @@ __pycache__
 .env
 staticfiles/
 mysite.log
-settings.py
-urls.py
+
+
 venv
 .idea/*
 media/
