@@ -7,7 +7,7 @@ from django.views.generic.list import ListView
 from mainapp.redis_queue import sms_queue
 from mainapp.sms_handler import send_confirmation_sms
 from .models import Request, Volunteer, DistrictManager, Contributor, DistrictNeed, Person, RescueCamp, NGO, \
-    Announcements , districts, RequestUpdate, PrivateRescueCamp
+    Announcements , districts, RequestUpdate, PrivateRescueCamp, CsvBulkUpload
 import django_filters
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import JsonResponse
@@ -127,7 +127,7 @@ def pcampdetails(request):
         req_data = PrivateRescueCamp.objects.get(id=id)
     except:
         return HttpResponseRedirect("/error?error_text={}".format('Sorry, we couldnt fetch details for that Camp'))
-    return render(request, 'mainapp/p_camp_details.html', {'req': req_data }) 
+    return render(request, 'mainapp/p_camp_details.html', {'req': req_data })
 
 def download_ngo_list(request):
     district = request.GET.get('district', None)
@@ -233,8 +233,10 @@ def relief_camps(request):
 def relief_camps_list(request):
     filter = RescueCampFilter(request.GET, queryset=RescueCamp.objects.filter(status='active'))
     relief_camps = filter.qs.annotate(count=Count('person')).order_by('district','name').all()
-
-    return render(request, 'mainapp/relief_camps_list.html', {'filter': filter , 'relief_camps' : relief_camps, 'district_chosen' : len(request.GET.get('district') or '')>0 })
+    paginator = Paginator(relief_camps,20)
+    page = request.GET.get('page')
+    req_reliefcamps = paginator.get_page(page)
+    return render(request, 'mainapp/relief_camps_list.html', {'filter': filter , 'relief_camps' : relief_camps, 'district_chosen' : len(request.GET.get('district') or '')>0,'relief_camps_pag': req_reliefcamps})
 
 
 class RequestFilter(django_filters.FilterSet):
@@ -517,6 +519,9 @@ def logout_view(request):
     return redirect('/relief_camps')
 
 class PersonForm(CustomForm):
+    checkin_date = forms.DateField(    required=False,input_formats=["%d-%m-%Y"],help_text="Use dd-mm-yyyy format. Eg. 18-08-2018")
+    checkout_date = forms.DateField(    required=False,input_formats=["%d-%m-%Y"],help_text="Use dd-mm-yyyy format. Eg. 21-08-2018")
+
     class Meta:
        model = Person
        fields = [
@@ -527,7 +532,10 @@ class PersonForm(CustomForm):
         'gender',
         'district',
         'address',
-        'notes'
+        'notes',
+        'checkin_date',
+        'checkout_date',
+        'status'
         ]
 
        widgets = {
@@ -535,7 +543,6 @@ class PersonForm(CustomForm):
            'notes': forms.Textarea(attrs={'rows':3}),
            'gender': forms.RadioSelect(),
         }
-
 
     def __init__(self, *args, **kwargs):
        camp_id = kwargs.pop('camp_id')
@@ -684,11 +691,14 @@ class PeopleFilter(django_filters.FilterSet):
 def find_people(request):
     filter = PeopleFilter(request.GET, queryset=Person.objects.all())
     people = filter.qs.order_by('name','-added_at')
-    paginator = Paginator(people, 50)
+    paginator = Paginator(people, PER_PAGE)
     page = request.GET.get('page')
     people = paginator.get_page(page)
-    return render(request, 'mainapp/people.html', {'filter': filter , "data" : people })
+    people.min_page = people.number - PAGE_LEFT
+    people.max_page = people.number + PAGE_RIGHT
+    people.lim_page = PAGE_INTERMEDIATE
 
+    return render(request, 'mainapp/people.html', {'filter': filter , "data" : people })
 
 def announcements(request):
     link_data = Announcements.objects.filter(is_pinned=False).order_by('-id').all()
@@ -714,7 +724,7 @@ class CoordinatorCampFilter(django_filters.FilterSet):
         if self.data == {}:
             self.queryset = self.queryset.none()
 
-            
+
 class PrivateCampFilter(django_filters.FilterSet):
     class Meta:
         model = PrivateRescueCamp
@@ -722,6 +732,9 @@ class PrivateCampFilter(django_filters.FilterSet):
             'district' : ['exact'],
             'name' : ['icontains']
         }
+
+
+
 
     def __init__(self, *args, **kwargs):
         super(PrivateCampFilter, self).__init__(*args, **kwargs)
@@ -758,17 +771,17 @@ class VolunteerConsent(UpdateView):
     model = Volunteer
     fields = ['has_consented']
     success_url = '/consent_success/'
-    
+
     def dispatch(self, request, *args, **kwargs):
         timestamp = parser.parse(self.get_object().joined.isoformat())
         timestamp = calendar.timegm(timestamp.utctimetuple())
         timestamp = str(timestamp)[-4:]
         request_ts = kwargs['ts']
-        
+
         if request_ts != timestamp:
             return HttpResponseRedirect("/error?error_text={}".format('Sorry, we couldnt fetch volunteer info'))
         return super(VolunteerConsent, self).dispatch(request, *args, **kwargs)
-        
+
 
 class ConsentSuccess(TemplateView):
     template_name = "mainapp/volunteer_consent_success.html"
@@ -792,10 +805,10 @@ class RequestUpdateView(CreateView):
         'notes'
     ]
     success_url = '/req_update_success/'
-    
+
     def original_request(self):
         return self.original_request
-    
+
     def updates(self):
         return self.updates
 
@@ -805,11 +818,11 @@ class RequestUpdateView(CreateView):
         #disable authentication
         # if not request.user.is_authenticated:
         #     return redirect('/login'+'?next=request_updates/'+kwargs['request_id']+'/')
-            
+
         self.original_request = get_object_or_404(Request, pk=kwargs['request_id'])
         self.updates = RequestUpdate.objects.all().filter(request_id=kwargs['request_id']).order_by('-update_ts')
         return super().dispatch(request, *args, **kwargs)
-        
+
     def form_valid(self, form):
         self.object = form.save(commit=False)
         self.object.request = self.original_request
@@ -819,27 +832,61 @@ class RequestUpdateView(CreateView):
 class ReqUpdateSuccess(TemplateView):
     template_name = "mainapp/request_update_success.html"
 
+
+class CollectionCenterFilter(django_filters.FilterSet):
+    class Meta:
+        model = CollectionCenter
+        fields = {
+            'name': ['icontains'],
+            'address': ['icontains'],
+            'contacts': ['icontains'],
+            'district': ['icontains'],
+            'lsg_name': ['icontains'],
+            'ward_name': ['icontains'],
+            'city': ['icontains'],
+         }
+
+    def __init__(self, *args, **kwargs):
+        super(CollectionCenterFilter, self).__init__(*args, **kwargs)
+        if self.data == {}:
+            self.queryset = self.queryset.none()
+
+
 class CollectionCenterListView(ListView):
     model = CollectionCenter
     paginate_by = PER_PAGE
     ordering = ['-id']
 
     def get_context_data(self, **kwargs):
+        location = self.kwargs['location']
+        inside_kerala = True if location == 'inside_kerala' else False
         context = super().get_context_data(**kwargs)
+        context['filter'] = CollectionCenterFilter(
+            self.request.GET, queryset=CollectionCenter.objects.filter(is_inside_kerala=inside_kerala).order_by('-id')
+        )
         return context
+
+
+class CollectionCenterForm(forms.ModelForm):
+    class Meta:
+        model = CollectionCenter
+        fields = [
+            'name',
+            'address',
+            'contacts',
+            'type_of_materials_collecting',
+            'is_inside_kerala',
+            'district',
+            'lsg_name',
+            'ward_name',
+            'city',
+        ]
+        widgets = {
+            'lsg_name': forms.Select(),
+            'ward_name': forms.Select(),
+        }
 
 
 class CollectionCenterView(CreateView):
     model = CollectionCenter
-    fields = [
-        'name',
-        'address',
-        'contacts',
-        'type_of_materials_collecting',
-        'is_inside_kerala',
-        'district',
-        'lsg_type',
-        'lsg_name',
-        'ward_name',
-        'city',
-    ]
+    form_class = CollectionCenterForm

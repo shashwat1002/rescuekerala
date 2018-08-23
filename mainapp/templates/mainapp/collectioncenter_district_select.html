@@ -3,13 +3,6 @@
 {% block content %}
 
 {% load bootstrap3 %}
-<!--Navigation Breadcrumbs-->
-<nav aria-label="breadcrumb">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="/">Home</a></li>
-    <li class="breadcrumb-item active" aria-current="page">Maps</li>
-  </ol>
-</nav>
 
 <div class="container text-center">
     <h1 class="main-logo">kerala<span style="font-weight: normal;">rescue</span></h1>
@@ -19,18 +12,18 @@
         <strong>ദുരിതാശ്വാസ പ്രവര്‍ത്തനങ്ങളും രക്ഷാ ദൗത്യങ്ങളും ഏകോപിപ്പിക്കാന്‍</strong><br/>
     <b><a href="{% static 'images/msg_cm.jpg' %}">Message from Hon. Chief Minister of Kerala</a></b>
   </p>
-    <a href="http://bit.ly/KeralaCamps" class="home-button card" role="button">
-        {% bootstrap_icon "globe" %}
+    <a href="/collection_centers/inside_kerala/" class="home-button card" role="button">
+        {% bootstrap_icon "home" %}
         <span class="text">
-          Relief Resources<br/>
-          <span class="ml small">ഗൂഗിൾ മാപ്പ് ദുരിതാശ്വാസ മാര്‍ഗങ്ങള്‍</span>
+          Inside Kerala<br/>
+          <span class="ml small"></span>
         </span>
     </a>
-    <a href="https://www.microid.in/keralaflood/" class="home-button card" role="button">
-        {% bootstrap_icon "globe" %}
+    <a href="/collection_centers/outside_kerala/" class="home-button card" role="button">
+        {% bootstrap_icon "send" %}
         <span class="text">
-          Flooded Streets<br/>
-          <span class="ml small">റോഡ് ‍</span>
+          Outside Kerala<br/>
+          <span class="ml small"> ‍</span>
         </span>
     </a>
     <p class="home-info">
